@@ -1,0 +1,15 @@
+## .NET build output
+bin/
+obj/
+
+## Visual Studio files
+.vs/
+*.user
+*.suo
+
+## Configuration files with sensitive data
+appsettings.json
+appsettings.*.json
+
+## Logs
+*.log 
