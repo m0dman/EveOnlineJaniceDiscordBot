@@ -4,7 +4,7 @@ A Discord bot that uses the Janice API to provide EVE Online item appraisals.
 
 ## Prerequisites
 
-- .NET 7.0 SDK
+- .NET 8.0 SDK
 - A Discord bot token (create one at https://discord.com/developers/applications)
 - A Janice API key (get one at https://janice.e-351.com/)
 
