@@ -88,7 +88,6 @@ namespace EveOnlineBot
                     var totalSellValue = appraisal.GetProperty("effectivePrices").GetProperty("totalSellPrice").GetDecimal();
                     var totalBuyValue = appraisal.GetProperty("effectivePrices").GetProperty("totalBuyPrice").GetDecimal();
                     var totalSplitValue = appraisal.GetProperty("effectivePrices").GetProperty("totalSplitPrice").GetDecimal();
-                    var totalBuyValue90Percent = totalBuyValue * 0.9m; // 90% of Jita buy
                     var totalVolume = appraisal.GetProperty("totalVolume").GetDecimal();
                     var totalPackagedVolume = appraisal.GetProperty("totalPackagedVolume").GetDecimal();
                     var marketName = appraisal.GetProperty("market").GetProperty("name").GetString();
@@ -144,7 +143,6 @@ namespace EveOnlineBot
                     var totalSellValue = appraisal.GetProperty("effectivePrices").GetProperty("totalSellPrice").GetDecimal();
                     var totalBuyValue = appraisal.GetProperty("effectivePrices").GetProperty("totalBuyPrice").GetDecimal();
                     var totalSplitValue = appraisal.GetProperty("effectivePrices").GetProperty("totalSplitPrice").GetDecimal();
-                    var totalBuyValue90Percent = totalBuyValue * 0.9m; // 90% of Jita buy
                     var totalVolume = appraisal.GetProperty("totalVolume").GetDecimal();
                     var totalPackagedVolume = appraisal.GetProperty("totalPackagedVolume").GetDecimal();
                     var marketName = appraisal.GetProperty("market").GetProperty("name").GetString();
@@ -250,7 +248,6 @@ namespace EveOnlineBot
                         builder.AddField("Buy Price", $"{prices.GetProperty("buyPrice").GetDecimal():N2} ISK", true);
                         builder.AddField("Sell Price", $"{prices.GetProperty("sellPrice").GetDecimal():N2} ISK", true);
                         builder.AddField("Split Price", $"{prices.GetProperty("splitPrice").GetDecimal():N2} ISK", true);
-                        builder.AddField("90% Buy Price", $"{prices.GetProperty("buyPrice90Percent").GetDecimal():N2} ISK", true);
 
                         // Add 5-day median prices
                         builder.AddField("5-Day Median Buy", $"{prices.GetProperty("buyPrice5DayMedian").GetDecimal():N2} ISK", true);
