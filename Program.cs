@@ -88,6 +88,7 @@ namespace EveOnlineBot
                     var totalSellValue = appraisal.GetProperty("effectivePrices").GetProperty("totalSellPrice").GetDecimal();
                     var totalBuyValue = appraisal.GetProperty("effectivePrices").GetProperty("totalBuyPrice").GetDecimal();
                     var totalSplitValue = appraisal.GetProperty("effectivePrices").GetProperty("totalSplitPrice").GetDecimal();
+                    var totalBuyValue90Percent = totalBuyValue * 0.9m;
                     var totalVolume = appraisal.GetProperty("totalVolume").GetDecimal();
                     var totalPackagedVolume = appraisal.GetProperty("totalPackagedVolume").GetDecimal();
                     var marketName = appraisal.GetProperty("market").GetProperty("name").GetString();
@@ -102,7 +103,8 @@ namespace EveOnlineBot
                     embed.AddField("Total Values", 
                         $"Sell Value: {totalSellValue:N2} ISK\n" +
                         $"Buy Value: {totalBuyValue:N2} ISK\n" +
-                        $"Split Value: {totalSplitValue:N2} ISK", false);
+                        $"Split Value: {totalSplitValue:N2} ISK\n" +
+                        $"90% Buy Value: {totalBuyValue90Percent:N2} ISK", false);
 
                     embed.AddField("Volume Information", 
                         $"Total Volume: {totalVolume:N2} m³\n" +
@@ -143,9 +145,11 @@ namespace EveOnlineBot
                     var totalSellValue = appraisal.GetProperty("effectivePrices").GetProperty("totalSellPrice").GetDecimal();
                     var totalBuyValue = appraisal.GetProperty("effectivePrices").GetProperty("totalBuyPrice").GetDecimal();
                     var totalSplitValue = appraisal.GetProperty("effectivePrices").GetProperty("totalSplitPrice").GetDecimal();
+                    var totalBuyValue90Percent = totalBuyValue * 0.9m;
                     var totalVolume = appraisal.GetProperty("totalVolume").GetDecimal();
                     var totalPackagedVolume = appraisal.GetProperty("totalPackagedVolume").GetDecimal();
                     var marketName = appraisal.GetProperty("market").GetProperty("name").GetString();
+                    Console.WriteLine(totalBuyValue90Percent);
 
                     var embed = new EmbedBuilder()
                         .WithTitle("Recalled Appraisal")
@@ -156,7 +160,8 @@ namespace EveOnlineBot
                     embed.AddField("Total Values", 
                         $"Sell Value: {totalSellValue:N2} ISK\n" +
                         $"Buy Value: {totalBuyValue:N2} ISK\n" +
-                        $"Split Value: {totalSplitValue:N2} ISK", false);
+                        $"Split Value: {totalSplitValue:N2} ISK\n" +
+                        $"90% Buy Value: {totalBuyValue90Percent:N2} ISK", false);
 
                     embed.AddField("Volume Information", 
                         $"Total Volume: {totalVolume:N2} m³\n" +
@@ -248,6 +253,7 @@ namespace EveOnlineBot
                         builder.AddField("Buy Price", $"{prices.GetProperty("buyPrice").GetDecimal():N2} ISK", true);
                         builder.AddField("Sell Price", $"{prices.GetProperty("sellPrice").GetDecimal():N2} ISK", true);
                         builder.AddField("Split Price", $"{prices.GetProperty("splitPrice").GetDecimal():N2} ISK", true);
+                        builder.AddField("Buy Price 90%", $"{prices.GetProperty("buyPrice").GetDecimal() * 0.9m:N2} ISK", true);
 
                         // Add 5-day median prices
                         builder.AddField("5-Day Median Buy", $"{prices.GetProperty("buyPrice5DayMedian").GetDecimal():N2} ISK", true);
