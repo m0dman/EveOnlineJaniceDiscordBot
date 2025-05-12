@@ -79,8 +79,8 @@ namespace EveOnlineBot
                     var lines = content.Split('\n', StringSplitOptions.RemoveEmptyEntries);
                     var requestBody = string.Join("\n", lines);
                     
-                    var fullAppraisal = await GetFullAppraisal(requestBody);
-                    var ninetyPercentAppraisal = await Get90PercentAppraisal(requestBody);
+                    var fullAppraisal = await GetAppraisal(requestBody, 1);
+                    var ninetyPercentAppraisal = await GetAppraisal(requestBody, 0.9f);
 
                     if (!fullAppraisal.TryGetProperty("items", out var itemsArray) || itemsArray.GetArrayLength() == 0)
                     {
@@ -183,60 +183,11 @@ namespace EveOnlineBot
             }
         }
 
-        private async Task<JsonElement> GetFullAppraisal(string items)
+        private async Task<JsonElement> GetAppraisal(string items, float percentage)
         {
             try
             {
-                var url = $"{_configuration["Janice:BaseUrl"]}/appraisal?market=2&persist=true&compactize=true&pricePercentage=1";
-                Console.WriteLine($"Making request to: {url}");
-                Console.WriteLine($"Using API Key: {_configuration["Janice:ApiKey"]}");
-
-                var content = new StringContent(
-                    items,
-                    System.Text.Encoding.UTF8,
-                    "text/plain"
-                );
-
-                // Add headers to match curl example
-                _httpClient.DefaultRequestHeaders.Accept.Clear();
-                _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-
-                var response = await _httpClient.PostAsync(url, content);
-                var responseContent = await response.Content.ReadAsStringAsync();
-                
-                Console.WriteLine($"Response Status: {response.StatusCode}");
-                Console.WriteLine($"Response Headers: {string.Join(", ", response.Headers.Select(h => $"{h.Key}: {string.Join(", ", h.Value)}"))}");
-                Console.WriteLine($"Response Content: {responseContent}");
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    throw new Exception($"API request failed with status {response.StatusCode}: {responseContent}");
-                }
-
-                if (string.IsNullOrEmpty(responseContent))
-                {
-                    throw new Exception("API returned empty response");
-                }
-
-                if (responseContent.StartsWith("<"))
-                {
-                    throw new Exception("API returned HTML instead of JSON. Please check your API key and endpoint configuration.");
-                }
-
-                return JsonSerializer.Deserialize<JsonElement>(responseContent);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error in GetAppraisal: {ex}");
-                throw;
-            }
-        }
-
-        private async Task<JsonElement> Get90PercentAppraisal(string items)
-        {
-            try
-            {
-                var url = $"{_configuration["Janice:BaseUrl"]}/appraisal?market=2&persist=true&compactize=true&pricePercentage=0.9";
+                var url = $"{_configuration["Janice:BaseUrl"]}/appraisal?market=2&persist=true&compactize=true&pricePercentage={percentage}";
                 Console.WriteLine($"Making request to: {url}");
                 Console.WriteLine($"Using API Key: {_configuration["Janice:ApiKey"]}");
 
