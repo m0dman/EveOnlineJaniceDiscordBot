@@ -185,6 +185,16 @@ namespace EveOnlineBot
 
         private async Task<JsonElement> GetAppraisal(string items, float percentage)
         {
+            /// <summary>
+            /// Makes a request to the Janice API to get an appraisal for the given items.
+            /// </summary>
+            /// <param name="items">The items to appraise, formatted as a string.</param>
+            /// <param name="percentage">The percentage of the appraisal to return (1.0 for full, 0.9 for 90%).</param>
+            /// <returns>A JsonElement containing the appraisal data.</returns>
+            /// <exception cref="Exception">Thrown if the API request fails or returns an error.</exception>
+            /// <exception cref="JsonException">Thrown if the response cannot be deserialized into a JsonElement.</exception>
+            /// <exception cref="ArgumentNullException">Thrown if the items string is null or empty.</exception>
+            /// <exception cref="HttpRequestException">Thrown if there is an issue with the HTTP request.</exception>
             try
             {
                 var url = $"{_configuration["Janice:BaseUrl"]}/appraisal?market=2&persist=true&compactize=true&pricePercentage={percentage}";
