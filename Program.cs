@@ -65,6 +65,7 @@ namespace EveOnlineBot
 
             if (message.Content.StartsWith("!appraise"))
             {
+                // Appraisal command
                 var content = message.Content.Replace("!appraise", "").Trim();
                 if (string.IsNullOrEmpty(content))
                 {
@@ -78,20 +79,24 @@ namespace EveOnlineBot
                     var lines = content.Split('\n', StringSplitOptions.RemoveEmptyEntries);
                     var requestBody = string.Join("\n", lines);
                     
-                    var appraisal = await GetAppraisal(requestBody);
-                    if (!appraisal.TryGetProperty("items", out var itemsArray) || itemsArray.GetArrayLength() == 0)
+                    var fullAppraisal = await GetAppraisal(requestBody, 1);
+                    var ninetyPercentAppraisal = await GetAppraisal(requestBody, 0.9f);
+
+                    if (!fullAppraisal.TryGetProperty("items", out var itemsArray) || itemsArray.GetArrayLength() == 0)
                     {
                         await message.Channel.SendMessageAsync("No valid items found in the appraisal.");
                         return;
                     }
 
-                    var totalSellValue = appraisal.GetProperty("effectivePrices").GetProperty("totalSellPrice").GetDecimal();
-                    var totalBuyValue = appraisal.GetProperty("effectivePrices").GetProperty("totalBuyPrice").GetDecimal();
-                    var totalSplitValue = appraisal.GetProperty("effectivePrices").GetProperty("totalSplitPrice").GetDecimal();
-                    var totalVolume = appraisal.GetProperty("totalVolume").GetDecimal();
-                    var totalPackagedVolume = appraisal.GetProperty("totalPackagedVolume").GetDecimal();
-                    var marketName = appraisal.GetProperty("market").GetProperty("name").GetString();
-                    var appraisalCode = appraisal.GetProperty("code").GetString();
+                    var totalSellValue = fullAppraisal.GetProperty("effectivePrices").GetProperty("totalSellPrice").GetDecimal();
+                    var totalBuyValue = fullAppraisal.GetProperty("effectivePrices").GetProperty("totalBuyPrice").GetDecimal();
+                    var totalSplitValue = fullAppraisal.GetProperty("effectivePrices").GetProperty("totalSplitPrice").GetDecimal();
+                    var totalBuyValue90Percent = ninetyPercentAppraisal.GetProperty("effectivePrices").GetProperty("totalBuyPrice").GetDecimal();
+                    var totalVolume = fullAppraisal.GetProperty("totalVolume").GetDecimal();
+                    var totalPackagedVolume = fullAppraisal.GetProperty("totalPackagedVolume").GetDecimal();
+                    var marketName = fullAppraisal.GetProperty("market").GetProperty("name").GetString();
+                    var fullAppraisalCode = fullAppraisal.GetProperty("code").GetString();
+                    var ninetyPercentAppraisalCode = ninetyPercentAppraisal.GetProperty("code").GetString();
 
                     var embed = new EmbedBuilder()
                         .WithTitle("Total Appraisal")
@@ -102,13 +107,15 @@ namespace EveOnlineBot
                     embed.AddField("Total Values", 
                         $"Sell Value: {totalSellValue:N2} ISK\n" +
                         $"Buy Value: {totalBuyValue:N2} ISK\n" +
-                        $"Split Value: {totalSplitValue:N2} ISK", false);
+                        $"Split Value: {totalSplitValue:N2} ISK\n" +
+                        $"90% Buy Value: {totalBuyValue90Percent:N2} ISK", false);
 
                     embed.AddField("Volume Information", 
                         $"Total Volume: {totalVolume:N2} m³\n" +
                         $"Total Packaged Volume: {totalPackagedVolume:N2} m³", false);
 
-                    embed.AddField("Appraisal Code", appraisalCode, false);
+                    embed.AddField("Full Appraisal Code", fullAppraisalCode, false);
+                    embed.AddField("90% Appraisal Code", ninetyPercentAppraisalCode, false);
 
                     await message.Channel.SendMessageAsync(embed: embed.Build());
                 }
@@ -118,6 +125,8 @@ namespace EveOnlineBot
                     await message.Channel.SendMessageAsync($"Error getting appraisal: {ex.Message}");
                 }
             }
+
+            // Recall command
             else if (message.Content.StartsWith("!recall"))
             {
                 var code = message.Content.Replace("!recall", "").Trim();
@@ -156,7 +165,7 @@ namespace EveOnlineBot
                     embed.AddField("Total Values", 
                         $"Sell Value: {totalSellValue:N2} ISK\n" +
                         $"Buy Value: {totalBuyValue:N2} ISK\n" +
-                        $"Split Value: {totalSplitValue:N2} ISK", false);
+                        $"Split Value: {totalSplitValue:N2} ISK\n", false);
 
                     embed.AddField("Volume Information", 
                         $"Total Volume: {totalVolume:N2} m³\n" +
@@ -174,11 +183,21 @@ namespace EveOnlineBot
             }
         }
 
-        private async Task<JsonElement> GetAppraisal(string items)
+        private async Task<JsonElement> GetAppraisal(string items, float percentage)
         {
+            /// <summary>
+            /// Makes a request to the Janice API to get an appraisal for the given items.
+            /// </summary>
+            /// <param name="items">The items to appraise, formatted as a string.</param>
+            /// <param name="percentage">The percentage of the appraisal to return (1.0 for full, 0.9 for 90%).</param>
+            /// <returns>A JsonElement containing the appraisal data.</returns>
+            /// <exception cref="Exception">Thrown if the API request fails or returns an error.</exception>
+            /// <exception cref="JsonException">Thrown if the response cannot be deserialized into a JsonElement.</exception>
+            /// <exception cref="ArgumentNullException">Thrown if the items string is null or empty.</exception>
+            /// <exception cref="HttpRequestException">Thrown if there is an issue with the HTTP request.</exception>
             try
             {
-                var url = $"{_configuration["Janice:BaseUrl"]}/appraisal?market=2&persist=true&compactize=true&pricePercentage=1";
+                var url = $"{_configuration["Janice:BaseUrl"]}/appraisal?market=2&persist=true&compactize=true&pricePercentage={percentage}";
                 Console.WriteLine($"Making request to: {url}");
                 Console.WriteLine($"Using API Key: {_configuration["Janice:ApiKey"]}");
 
