@@ -78,7 +78,7 @@ namespace EveOnlineBot
                     var lines = content.Split('\n', StringSplitOptions.RemoveEmptyEntries);
                     var requestBody = string.Join("\n", lines);
                     
-                    var appraisal = await GetAppraisal(requestBody);
+                    var appraisal = await GetAppraisal(requestBody, 2);
                     if (!appraisal.TryGetProperty("items", out var itemsArray) || itemsArray.GetArrayLength() == 0)
                     {
                         await message.Channel.SendMessageAsync("No valid items found in the appraisal.");
@@ -165,20 +165,73 @@ namespace EveOnlineBot
                     embed.AddField("Appraisal Code", code, false);
 
                     await message.Channel.SendMessageAsync(embed: embed.Build());
-                }
+                }                
                 catch (Exception ex)
                 {
                     Console.WriteLine($"Error in MessageReceived: {ex}");
                     await message.Channel.SendMessageAsync($"Error recalling appraisal: {ex.Message}");
                 }
             }
+
+            // NPC market
+            else if (message.Content.StartsWith("!npcbuy"))
+            {
+                var content = message.Content.Replace("!npcbuy", "").Trim();
+                if (string.IsNullOrEmpty(content))
+                {
+                    await message.Channel.SendMessageAsync("Please provide items to appraise.");
+                    return;
+                }
+
+                try
+                {
+                    // Split the input into lines and process each line
+                    var lines = content.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+                    var requestBody = string.Join("\n", lines);
+                    
+                    var appraisal = await GetAppraisal(requestBody, 6);
+                    if (!appraisal.TryGetProperty("items", out var itemsArray) || itemsArray.GetArrayLength() == 0)
+                    {
+                        await message.Channel.SendMessageAsync("No valid items found in the appraisal.");
+                        return;
+                    }
+
+                    var totalBuyValue = appraisal.GetProperty("effectivePrices").GetProperty("totalBuyPrice").GetDecimal();
+                    var totalVolume = appraisal.GetProperty("totalVolume").GetDecimal();
+                    var totalPackagedVolume = appraisal.GetProperty("totalPackagedVolume").GetDecimal();
+                    var marketName = appraisal.GetProperty("market").GetProperty("name").GetString();
+                    var appraisalCode = appraisal.GetProperty("code").GetString();
+
+                    var embed = new EmbedBuilder()
+                        .WithTitle("Total Appraisal")
+                        .WithColor(Color.Blue)
+                        .WithCurrentTimestamp()
+                        .WithFooter($"Market: {marketName}");
+
+                    embed.AddField("Total Values", 
+                        $"Buy Value: {totalBuyValue:N2} ISK\n", false);
+
+                    embed.AddField("Volume Information", 
+                        $"Total Volume: {totalVolume:N2} m³\n" +
+                        $"Total Packaged Volume: {totalPackagedVolume:N2} m³", false);
+
+                    embed.AddField("Appraisal Code", appraisalCode, false);
+
+                    await message.Channel.SendMessageAsync(embed: embed.Build());
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error in MessageReceived: {ex}");
+                    await message.Channel.SendMessageAsync($"Error getting appraisal: {ex.Message}");
+                }
+            }
         }
 
-        private async Task<JsonElement> GetAppraisal(string items)
+        private async Task<JsonElement> GetAppraisal(string items, int market)
         {
             try
             {
-                var url = $"{_configuration["Janice:BaseUrl"]}/appraisal?market=2&persist=true&compactize=true&pricePercentage=1";
+                var url = $"{_configuration["Janice:BaseUrl"]}/appraisal?market={market}&persist=true&compactize=true&pricePercentage=1";
                 Console.WriteLine($"Making request to: {url}");
                 Console.WriteLine($"Using API Key: {_configuration["Janice:ApiKey"]}");
 
