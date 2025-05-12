@@ -149,7 +149,6 @@ namespace EveOnlineBot
                     var totalVolume = appraisal.GetProperty("totalVolume").GetDecimal();
                     var totalPackagedVolume = appraisal.GetProperty("totalPackagedVolume").GetDecimal();
                     var marketName = appraisal.GetProperty("market").GetProperty("name").GetString();
-                    Console.WriteLine(totalBuyValue90Percent);
 
                     var embed = new EmbedBuilder()
                         .WithTitle("Recalled Appraisal")
