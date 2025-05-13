@@ -81,7 +81,7 @@ namespace EveOnlineBot
                     var requestBody = string.Join("\n", lines);
                     
                     var fullAppraisal = await GetAppraisal(requestBody, 1, 2);
-                    var ninetyPercentAppraisal = await GetAppraisal(requestBody, 0.9f, 2);
+                    var ninetyPercentAppraisal = await GetAppraisal(requestBody, 0.9d, 2);
 
                     if (!fullAppraisal.TryGetProperty("items", out var itemsArray) || itemsArray.GetArrayLength() == 0)
                     {
@@ -200,7 +200,7 @@ namespace EveOnlineBot
                     var requestBody = string.Join("\n", lines);
                     
 
-                    var appraisal = await GetAppraisal(requestBody, 0.9f, 6);
+                    var appraisal = await GetAppraisal(requestBody, 0.9d, 6);
                     if (!appraisal.TryGetProperty("items", out var itemsArray) || itemsArray.GetArrayLength() == 0)
                     {
                         await message.Channel.SendMessageAsync("No valid items found in the appraisal.");
@@ -293,7 +293,7 @@ namespace EveOnlineBot
             
         }
 
-        private async Task<JsonElement> GetAppraisal(string items, float percentage, int market)
+        private async Task<JsonElement> GetAppraisal(string items, double percentage, int market)
 
         {
             /// <summary>
