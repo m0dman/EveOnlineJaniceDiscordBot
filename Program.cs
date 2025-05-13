@@ -10,6 +10,7 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace EveOnlineBot
 {
@@ -63,10 +64,10 @@ namespace EveOnlineBot
         {
             if (message.Author.IsBot) return;
 
-            if (message.Content.StartsWith("!appraise"))
+            if (Regex.IsMatch(message.Content, @"^!appraise"))
             {
                 // Appraisal command
-                var content = message.Content.Replace("!appraise", "").Trim();
+                var content = Regex.Replace(message.Content, @"^!appraise", "").Trim();
                 if (string.IsNullOrEmpty(content))
                 {
                     await message.Channel.SendMessageAsync("Please provide items to appraise.");
@@ -108,7 +109,7 @@ namespace EveOnlineBot
                         $"Sell Value: {totalSellValue:N2} ISK\n" +
                         $"Buy Value: {totalBuyValue:N2} ISK\n" +
                         $"Split Value: {totalSplitValue:N2} ISK\n" +
-                        $"90% Buy Value: {totalBuyValue90Percent:N2} ISK", false);
+                        $"Buy Value @90%: {totalBuyValue90Percent:N2} ISK", false);
 
                     embed.AddField("Volume Information", 
                         $"Total Volume: {totalVolume:N2} m³\n" +
@@ -127,9 +128,9 @@ namespace EveOnlineBot
             }
 
             // Recall command
-            else if (message.Content.StartsWith("!recall"))
+            else if (Regex.IsMatch(message.Content, @"^!recall"))
             {
-                var code = message.Content.Replace("!recall", "").Trim();
+                var code = Regex.Replace(message.Content, @"^!recall", "").Trim();
                 if (string.IsNullOrEmpty(code))
                 {
                     await message.Channel.SendMessageAsync("Please provide an appraisal code to recall.");
@@ -183,9 +184,9 @@ namespace EveOnlineBot
             }
 
             // NPC market
-            else if (message.Content.StartsWith("!npcbuy"))
+            else if (Regex.IsMatch(message.Content, @"^!npcbuy90\b", RegexOptions.IgnoreCase))
             {
-                var content = message.Content.Replace("!npcbuy", "").Trim();
+                var content = Regex.Replace(message.Content, @"^!npcbuy90\b", "", RegexOptions.IgnoreCase).Trim();
                 if (string.IsNullOrEmpty(content))
                 {
                     await message.Channel.SendMessageAsync("Please provide items to appraise.");
@@ -198,6 +199,60 @@ namespace EveOnlineBot
                     var lines = content.Split('\n', StringSplitOptions.RemoveEmptyEntries);
                     var requestBody = string.Join("\n", lines);
                     
+
+                    var appraisal = await GetAppraisal(requestBody, 0.9f, 6);
+                    if (!appraisal.TryGetProperty("items", out var itemsArray) || itemsArray.GetArrayLength() == 0)
+                    {
+                        await message.Channel.SendMessageAsync("No valid items found in the appraisal.");
+                        return;
+                    }
+
+                    var totalBuyValue = appraisal.GetProperty("effectivePrices").GetProperty("totalBuyPrice").GetDecimal();
+                    var totalVolume = appraisal.GetProperty("totalVolume").GetDecimal();
+                    var totalPackagedVolume = appraisal.GetProperty("totalPackagedVolume").GetDecimal();
+                    var marketName = appraisal.GetProperty("market").GetProperty("name").GetString();
+                    var appraisalCode = appraisal.GetProperty("code").GetString();
+
+                    var embed = new EmbedBuilder()
+                        .WithTitle("NPC Buy @90%")
+                        .WithColor(Color.Blue)
+                        .WithCurrentTimestamp()
+                        .WithFooter($"Market: {marketName}");
+
+                    embed.AddField("Total Values", 
+                        $"Buy Value: {totalBuyValue:N2} ISK\n", false);
+
+                    embed.AddField("Volume Information", 
+                        $"Total Volume: {totalVolume:N2} m³\n" +
+                        $"Total Packaged Volume: {totalPackagedVolume:N2} m³", false);
+
+                    embed.AddField("Appraisal Code", appraisalCode, false);
+
+                    await message.Channel.SendMessageAsync(embed: embed.Build());
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error in MessageReceived: {ex}");
+                    await message.Channel.SendMessageAsync($"Error getting appraisal: {ex.Message}");
+                }
+            }
+
+            // NPC market
+            else if (Regex.IsMatch(message.Content, @"^!npcbuy"))
+            {
+                var content = Regex.Replace(message.Content, @"^!npcbuy", "").Trim();
+                if (string.IsNullOrEmpty(content))
+                {
+                    await message.Channel.SendMessageAsync("Please provide items to appraise.");
+                    return;
+                }
+
+                try
+                {
+                    // Split the input into lines and process each line
+                    var lines = content.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+                    var requestBody = string.Join("\n", lines);
+
                     var appraisal = await GetAppraisal(requestBody, 1, 6);
                     if (!appraisal.TryGetProperty("items", out var itemsArray) || itemsArray.GetArrayLength() == 0)
                     {
@@ -234,6 +289,8 @@ namespace EveOnlineBot
                     await message.Channel.SendMessageAsync($"Error getting appraisal: {ex.Message}");
                 }
             }
+
+            
         }
 
         private async Task<JsonElement> GetAppraisal(string items, float percentage, int market)
