@@ -24,9 +24,16 @@ A Discord bot that uses the Janice API to provide EVE Online item appraisals.
 ```
 
 2. Build and run the bot:
+##### On Windows
 ```bash
 dotnet build
 dotnet run
+```
+##### On Linux
+```bash
+dotnet publish -r linux-x64
+cd /bin/Release/net8.0/linux-x64
+dotnet EVEOnlineDiscordBot.dll
 ```
 
 ## Usage
