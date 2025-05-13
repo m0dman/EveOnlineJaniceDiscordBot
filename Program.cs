@@ -64,10 +64,10 @@ namespace EveOnlineBot
         {
             if (message.Author.IsBot) return;
 
-            if (Regex.IsMatch(message.Content, @"^!appraise"))
+            if (Regex.IsMatch(message.Content, @"^!appraise\b"))
             {
                 // Appraisal command
-                var content = Regex.Replace(message.Content, @"^!appraise", "").Trim();
+                var content = Regex.Replace(message.Content, @"^!appraise\b", "").Trim();
                 if (string.IsNullOrEmpty(content))
                 {
                     await message.Channel.SendMessageAsync("Please provide items to appraise.");
@@ -128,9 +128,9 @@ namespace EveOnlineBot
             }
 
             // Recall command
-            else if (Regex.IsMatch(message.Content, @"^!recall"))
+            else if (Regex.IsMatch(message.Content, @"^!recall\b"))
             {
-                var code = Regex.Replace(message.Content, @"^!recall", "").Trim();
+                var code = Regex.Replace(message.Content, @"^!recall\b", "").Trim();
                 if (string.IsNullOrEmpty(code))
                 {
                     await message.Channel.SendMessageAsync("Please provide an appraisal code to recall.");
