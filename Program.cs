@@ -199,6 +199,7 @@ namespace EveOnlineBot
                     var lines = content.Split('\n', StringSplitOptions.RemoveEmptyEntries);
                     var requestBody = string.Join("\n", lines);
                     
+
                     var appraisal = await GetAppraisal(requestBody, 0.9f, 6);
                     if (!appraisal.TryGetProperty("items", out var itemsArray) || itemsArray.GetArrayLength() == 0)
                     {
@@ -219,7 +220,7 @@ namespace EveOnlineBot
                         .WithFooter($"Market: {marketName}");
 
                     embed.AddField("Total Values", 
-                        $"Buy Value @90%: {totalBuyValue:N2} ISK\n", false);
+                        $"Buy Value: {totalBuyValue:N2} ISK\n", false);
 
                     embed.AddField("Volume Information", 
                         $"Total Volume: {totalVolume:N2} m³\n" +
@@ -251,7 +252,7 @@ namespace EveOnlineBot
                     // Split the input into lines and process each line
                     var lines = content.Split('\n', StringSplitOptions.RemoveEmptyEntries);
                     var requestBody = string.Join("\n", lines);
-                    
+
                     var appraisal = await GetAppraisal(requestBody, 1, 6);
                     if (!appraisal.TryGetProperty("items", out var itemsArray) || itemsArray.GetArrayLength() == 0)
                     {
