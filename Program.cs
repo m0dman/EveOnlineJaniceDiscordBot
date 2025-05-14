@@ -10,6 +10,7 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace EveOnlineBot
 {
@@ -63,9 +64,10 @@ namespace EveOnlineBot
         {
             if (message.Author.IsBot) return;
 
-            if (message.Content.StartsWith("!appraise"))
+            if (Regex.IsMatch(message.Content, @"^!appraise\b"))
             {
-                var content = message.Content.Replace("!appraise", "").Trim();
+                // Appraisal command
+                var content = Regex.Replace(message.Content, @"^!appraise\b", "").Trim();
                 if (string.IsNullOrEmpty(content))
                 {
                     await message.Channel.SendMessageAsync("Please provide items to appraise.");
@@ -78,20 +80,24 @@ namespace EveOnlineBot
                     var lines = content.Split('\n', StringSplitOptions.RemoveEmptyEntries);
                     var requestBody = string.Join("\n", lines);
                     
-                    var appraisal = await GetAppraisal(requestBody);
-                    if (!appraisal.TryGetProperty("items", out var itemsArray) || itemsArray.GetArrayLength() == 0)
+                    var fullAppraisal = await GetAppraisal(requestBody, 100d, 2);
+                    var ninetyPercentAppraisal = await GetAppraisal(requestBody, 90d, 2);
+
+                    if (!fullAppraisal.TryGetProperty("items", out var itemsArray) || itemsArray.GetArrayLength() == 0)
                     {
                         await message.Channel.SendMessageAsync("No valid items found in the appraisal.");
                         return;
                     }
 
-                    var totalSellValue = appraisal.GetProperty("effectivePrices").GetProperty("totalSellPrice").GetDecimal();
-                    var totalBuyValue = appraisal.GetProperty("effectivePrices").GetProperty("totalBuyPrice").GetDecimal();
-                    var totalSplitValue = appraisal.GetProperty("effectivePrices").GetProperty("totalSplitPrice").GetDecimal();
-                    var totalVolume = appraisal.GetProperty("totalVolume").GetDecimal();
-                    var totalPackagedVolume = appraisal.GetProperty("totalPackagedVolume").GetDecimal();
-                    var marketName = appraisal.GetProperty("market").GetProperty("name").GetString();
-                    var appraisalCode = appraisal.GetProperty("code").GetString();
+                    var totalSellValue = fullAppraisal.GetProperty("effectivePrices").GetProperty("totalSellPrice").GetDecimal();
+                    var totalBuyValue = fullAppraisal.GetProperty("effectivePrices").GetProperty("totalBuyPrice").GetDecimal();
+                    var totalSplitValue = fullAppraisal.GetProperty("effectivePrices").GetProperty("totalSplitPrice").GetDecimal();
+                    var totalBuyValue90Percent = ninetyPercentAppraisal.GetProperty("effectivePrices").GetProperty("totalBuyPrice").GetDecimal();
+                    var totalVolume = fullAppraisal.GetProperty("totalVolume").GetDecimal();
+                    var totalPackagedVolume = fullAppraisal.GetProperty("totalPackagedVolume").GetDecimal();
+                    var marketName = fullAppraisal.GetProperty("market").GetProperty("name").GetString();
+                    var fullAppraisalCode = fullAppraisal.GetProperty("code").GetString();
+                    var ninetyPercentAppraisalCode = ninetyPercentAppraisal.GetProperty("code").GetString();
 
                     var embed = new EmbedBuilder()
                         .WithTitle("Total Appraisal")
@@ -102,13 +108,15 @@ namespace EveOnlineBot
                     embed.AddField("Total Values", 
                         $"Sell Value: {totalSellValue:N2} ISK\n" +
                         $"Buy Value: {totalBuyValue:N2} ISK\n" +
-                        $"Split Value: {totalSplitValue:N2} ISK", false);
+                        $"Split Value: {totalSplitValue:N2} ISK\n" +
+                        $"Buy Value @90%: {totalBuyValue90Percent:N2} ISK", false);
 
                     embed.AddField("Volume Information", 
                         $"Total Volume: {totalVolume:N2} m³\n" +
                         $"Total Packaged Volume: {totalPackagedVolume:N2} m³", false);
 
-                    embed.AddField("Appraisal Code", appraisalCode, false);
+                    embed.AddField("Full Appraisal Code", fullAppraisalCode, false);
+                    embed.AddField("90% Appraisal Code", ninetyPercentAppraisalCode, false);
 
                     await message.Channel.SendMessageAsync(embed: embed.Build());
                 }
@@ -118,9 +126,11 @@ namespace EveOnlineBot
                     await message.Channel.SendMessageAsync($"Error getting appraisal: {ex.Message}");
                 }
             }
-            else if (message.Content.StartsWith("!recall"))
+
+            // Recall command
+            else if (Regex.IsMatch(message.Content, @"^!recall\b"))
             {
-                var code = message.Content.Replace("!recall", "").Trim();
+                var code = Regex.Replace(message.Content, @"^!recall\b", "").Trim();
                 if (string.IsNullOrEmpty(code))
                 {
                     await message.Channel.SendMessageAsync("Please provide an appraisal code to recall.");
@@ -156,7 +166,7 @@ namespace EveOnlineBot
                     embed.AddField("Total Values", 
                         $"Sell Value: {totalSellValue:N2} ISK\n" +
                         $"Buy Value: {totalBuyValue:N2} ISK\n" +
-                        $"Split Value: {totalSplitValue:N2} ISK", false);
+                        $"Split Value: {totalSplitValue:N2} ISK\n", false);
 
                     embed.AddField("Volume Information", 
                         $"Total Volume: {totalVolume:N2} m³\n" +
@@ -165,20 +175,141 @@ namespace EveOnlineBot
                     embed.AddField("Appraisal Code", code, false);
 
                     await message.Channel.SendMessageAsync(embed: embed.Build());
-                }
+                }                
                 catch (Exception ex)
                 {
                     Console.WriteLine($"Error in MessageReceived: {ex}");
                     await message.Channel.SendMessageAsync($"Error recalling appraisal: {ex.Message}");
                 }
             }
+
+            // NPC market
+            else if (Regex.IsMatch(message.Content, @"^!npcbuy90\b", RegexOptions.IgnoreCase))
+            {
+                var content = Regex.Replace(message.Content, @"^!npcbuy90\b", "", RegexOptions.IgnoreCase).Trim();
+                if (string.IsNullOrEmpty(content))
+                {
+                    await message.Channel.SendMessageAsync("Please provide items to appraise.");
+                    return;
+                }
+
+                try
+                {
+                    // Split the input into lines and process each line
+                    var lines = content.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+                    var requestBody = string.Join("\n", lines);
+                    
+
+                    var appraisal = await GetAppraisal(requestBody, 90d, 6);
+                    if (!appraisal.TryGetProperty("items", out var itemsArray) || itemsArray.GetArrayLength() == 0)
+                    {
+                        await message.Channel.SendMessageAsync("No valid items found in the appraisal.");
+                        return;
+                    }
+
+                    var totalBuyValue = appraisal.GetProperty("effectivePrices").GetProperty("totalBuyPrice").GetDecimal();
+                    var totalVolume = appraisal.GetProperty("totalVolume").GetDecimal();
+                    var totalPackagedVolume = appraisal.GetProperty("totalPackagedVolume").GetDecimal();
+                    var marketName = appraisal.GetProperty("market").GetProperty("name").GetString();
+                    var appraisalCode = appraisal.GetProperty("code").GetString();
+
+                    var embed = new EmbedBuilder()
+                        .WithTitle("NPC Buy @90%")
+                        .WithColor(Color.Blue)
+                        .WithCurrentTimestamp()
+                        .WithFooter($"Market: {marketName}");
+
+                    embed.AddField("Total Values", 
+                        $"Buy Value: {totalBuyValue:N2} ISK\n", false);
+
+                    embed.AddField("Volume Information", 
+                        $"Total Volume: {totalVolume:N2} m³\n" +
+                        $"Total Packaged Volume: {totalPackagedVolume:N2} m³", false);
+
+                    embed.AddField("Appraisal Code", appraisalCode, false);
+
+                    await message.Channel.SendMessageAsync(embed: embed.Build());
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error in MessageReceived: {ex}");
+                    await message.Channel.SendMessageAsync($"Error getting appraisal: {ex.Message}");
+                }
+            }
+
+            // NPC market
+            else if (Regex.IsMatch(message.Content, @"^!npcbuy"))
+            {
+                var content = Regex.Replace(message.Content, @"^!npcbuy", "").Trim();
+                if (string.IsNullOrEmpty(content))
+                {
+                    await message.Channel.SendMessageAsync("Please provide items to appraise.");
+                    return;
+                }
+
+                try
+                {
+                    // Split the input into lines and process each line
+                    var lines = content.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+                    var requestBody = string.Join("\n", lines);
+
+                    var appraisal = await GetAppraisal(requestBody, 100d, 6);
+                    if (!appraisal.TryGetProperty("items", out var itemsArray) || itemsArray.GetArrayLength() == 0)
+                    {
+                        await message.Channel.SendMessageAsync("No valid items found in the appraisal.");
+                        return;
+                    }
+
+                    var totalBuyValue = appraisal.GetProperty("effectivePrices").GetProperty("totalBuyPrice").GetDecimal();
+                    var totalVolume = appraisal.GetProperty("totalVolume").GetDecimal();
+                    var totalPackagedVolume = appraisal.GetProperty("totalPackagedVolume").GetDecimal();
+                    var marketName = appraisal.GetProperty("market").GetProperty("name").GetString();
+                    var appraisalCode = appraisal.GetProperty("code").GetString();
+
+                    var embed = new EmbedBuilder()
+                        .WithTitle("Total Appraisal")
+                        .WithColor(Color.Blue)
+                        .WithCurrentTimestamp()
+                        .WithFooter($"Market: {marketName}");
+
+                    embed.AddField("Total Values", 
+                        $"Buy Value: {totalBuyValue:N2} ISK\n", false);
+
+                    embed.AddField("Volume Information", 
+                        $"Total Volume: {totalVolume:N2} m³\n" +
+                        $"Total Packaged Volume: {totalPackagedVolume:N2} m³", false);
+
+                    embed.AddField("Appraisal Code", appraisalCode, false);
+
+                    await message.Channel.SendMessageAsync(embed: embed.Build());
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error in MessageReceived: {ex}");
+                    await message.Channel.SendMessageAsync($"Error getting appraisal: {ex.Message}");
+                }
+            }
+
+            
         }
 
-        private async Task<JsonElement> GetAppraisal(string items)
+        private async Task<JsonElement> GetAppraisal(string items, double percentage, int market)
+
         {
+            /// <summary>
+            /// Makes a request to the Janice API to get an appraisal for the given items.
+            /// </summary>
+            /// <param name="items">The items to appraise, formatted as a string.</param>
+            /// <param name="percentage">The percentage of the appraisal to return (100 for full, 90 for 90%).</param>
+            /// <returns>A JsonElement containing the appraisal data.</returns>
+            /// <exception cref="Exception">Thrown if the API request fails or returns an error.</exception>
+            /// <exception cref="JsonException">Thrown if the response cannot be deserialized into a JsonElement.</exception>
+            /// <exception cref="ArgumentNullException">Thrown if the items string is null or empty.</exception>
+            /// <exception cref="HttpRequestException">Thrown if there is an issue with the HTTP request.</exception>
             try
             {
-                var url = $"{_configuration["Janice:BaseUrl"]}/appraisal?market=2&persist=true&compactize=true&pricePercentage=1";
+                var url = $"{_configuration["Janice:BaseUrl"]}/appraisal?market={market}&persist=true&compactize=true&pricePercentage={percentage}";
+
                 Console.WriteLine($"Making request to: {url}");
                 Console.WriteLine($"Using API Key: {_configuration["Janice:ApiKey"]}");
 
