@@ -80,8 +80,8 @@ namespace EveOnlineBot
                     var lines = content.Split('\n', StringSplitOptions.RemoveEmptyEntries);
                     var requestBody = string.Join("\n", lines);
                     
-                    var fullAppraisal = await GetAppraisal(requestBody, 1, 2);
-                    var ninetyPercentAppraisal = await GetAppraisal(requestBody, 0.9d, 2);
+                    var fullAppraisal = await GetAppraisal(requestBody, 100d, 2);
+                    var ninetyPercentAppraisal = await GetAppraisal(requestBody, 90d, 2);
 
                     if (!fullAppraisal.TryGetProperty("items", out var itemsArray) || itemsArray.GetArrayLength() == 0)
                     {
@@ -200,7 +200,7 @@ namespace EveOnlineBot
                     var requestBody = string.Join("\n", lines);
                     
 
-                    var appraisal = await GetAppraisal(requestBody, 0.9d, 6);
+                    var appraisal = await GetAppraisal(requestBody, 90d, 6);
                     if (!appraisal.TryGetProperty("items", out var itemsArray) || itemsArray.GetArrayLength() == 0)
                     {
                         await message.Channel.SendMessageAsync("No valid items found in the appraisal.");
@@ -253,7 +253,7 @@ namespace EveOnlineBot
                     var lines = content.Split('\n', StringSplitOptions.RemoveEmptyEntries);
                     var requestBody = string.Join("\n", lines);
 
-                    var appraisal = await GetAppraisal(requestBody, 1, 6);
+                    var appraisal = await GetAppraisal(requestBody, 100d, 6);
                     if (!appraisal.TryGetProperty("items", out var itemsArray) || itemsArray.GetArrayLength() == 0)
                     {
                         await message.Channel.SendMessageAsync("No valid items found in the appraisal.");
@@ -300,7 +300,7 @@ namespace EveOnlineBot
             /// Makes a request to the Janice API to get an appraisal for the given items.
             /// </summary>
             /// <param name="items">The items to appraise, formatted as a string.</param>
-            /// <param name="percentage">The percentage of the appraisal to return (1.0 for full, 0.9 for 90%).</param>
+            /// <param name="percentage">The percentage of the appraisal to return (100 for full, 90 for 90%).</param>
             /// <returns>A JsonElement containing the appraisal data.</returns>
             /// <exception cref="Exception">Thrown if the API request fails or returns an error.</exception>
             /// <exception cref="JsonException">Thrown if the response cannot be deserialized into a JsonElement.</exception>
