@@ -80,8 +80,8 @@ namespace EveOnlineBot
                     var lines = content.Split('\n', StringSplitOptions.RemoveEmptyEntries);
                     var requestBody = string.Join("\n", lines);
                     
-                    var fullAppraisal = await GetAppraisal(requestBody, 100d, 2);
-                    var ninetyPercentAppraisal = await GetAppraisal(requestBody, 90d, 2);
+                    var fullAppraisal = await GetAppraisal(requestBody, 1d, 2);
+                    var ninetyPercentAppraisal = await GetAppraisal(requestBody, 0.9d, 2);
 
                     if (!fullAppraisal.TryGetProperty("items", out var itemsArray) || itemsArray.GetArrayLength() == 0)
                     {
@@ -200,7 +200,7 @@ namespace EveOnlineBot
                     var requestBody = string.Join("\n", lines);
                     
 
-                    var appraisal = await GetAppraisal(requestBody, 90d, 6);
+                    var appraisal = await GetAppraisal(requestBody, 0.9d, 6);
                     if (!appraisal.TryGetProperty("items", out var itemsArray) || itemsArray.GetArrayLength() == 0)
                     {
                         await message.Channel.SendMessageAsync("No valid items found in the appraisal.");
@@ -253,7 +253,7 @@ namespace EveOnlineBot
                     var lines = content.Split('\n', StringSplitOptions.RemoveEmptyEntries);
                     var requestBody = string.Join("\n", lines);
 
-                    var appraisal = await GetAppraisal(requestBody, 100d, 6);
+                    var appraisal = await GetAppraisal(requestBody, 1d, 6);
                     if (!appraisal.TryGetProperty("items", out var itemsArray) || itemsArray.GetArrayLength() == 0)
                     {
                         await message.Channel.SendMessageAsync("No valid items found in the appraisal.");
