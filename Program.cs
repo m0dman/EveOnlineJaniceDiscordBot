@@ -479,7 +479,42 @@ namespace EveOnlineBot
                 {
                     // Split the input into lines and process each line
                     var lines = content.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-                    var requestBody = string.Join("\n", lines);
+                    var formattedItems = new StringBuilder();
+                    
+                    foreach (var line in lines)
+                    {
+                        var parts = line.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                        var currentItem = new List<string>();
+                        
+                        for (int i = 0; i < parts.Length; i++)
+                        {
+                            var part = parts[i].Trim();
+                            if (string.IsNullOrWhiteSpace(part)) continue;
+
+                            // If this part is a number, it's a quantity
+                            if (int.TryParse(part, out int quantity))
+                            {
+                                if (currentItem.Count > 0)
+                                {
+                                    formattedItems.AppendLine($"{string.Join(" ", currentItem)}\t{quantity}");
+                                    currentItem.Clear();
+                                }
+                            }
+                            else
+                            {
+                                currentItem.Add(part);
+                            }
+                        }
+
+                        // Add the last item if there is one
+                        if (currentItem.Count > 0)
+                        {
+                            formattedItems.AppendLine($"{string.Join(" ", currentItem)}\t1");
+                        }
+                    }
+
+                    var requestBody = formattedItems.ToString().Trim();
+                    Console.WriteLine($"Formatted items for API:\n{requestBody}"); // Debug output
                     
                     var fullAppraisal = await GetAppraisal(requestBody, 1d, 2);
                     var ninetyPercentAppraisal = await GetAppraisal(requestBody, 0.9d, 2);
@@ -1106,42 +1141,40 @@ namespace EveOnlineBot
                     return;
                 }
 
-                // Format items string - handle items with quantities
+                // Split the input into lines and process each line
+                var lines = items.Split('\n', StringSplitOptions.RemoveEmptyEntries);
                 var formattedItems = new StringBuilder();
-                var parts = items.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-                var currentItem = new List<string>();
                 
-                for (int i = 0; i < parts.Length; i++)
+                foreach (var line in lines)
                 {
-                    var part = parts[i].Trim();
-                    if (string.IsNullOrWhiteSpace(part)) continue;
-
-                    // If this part is a number, it's a quantity
-                    if (int.TryParse(part, out int quantity))
+                    var parts = line.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                    var currentItem = new List<string>();
+                    
+                    for (int i = 0; i < parts.Length; i++)
                     {
-                        if (currentItem.Count > 0)
+                        var part = parts[i].Trim();
+                        if (string.IsNullOrWhiteSpace(part)) continue;
+
+                        // If this part is a number, it's a quantity
+                        if (int.TryParse(part, out int quantity))
                         {
-                            formattedItems.AppendLine($"{string.Join(" ", currentItem)}\t{quantity}");
-                            currentItem.Clear();
+                            if (currentItem.Count > 0)
+                            {
+                                formattedItems.AppendLine($"{string.Join(" ", currentItem)}\t{quantity}");
+                                currentItem.Clear();
+                            }
+                        }
+                        else
+                        {
+                            currentItem.Add(part);
                         }
                     }
-                    // If this part starts with "Datacore" and we have a current item, start a new item
-                    else if (part.StartsWith("Datacore", StringComparison.OrdinalIgnoreCase) && currentItem.Count > 0)
+
+                    // Add the last item if there is one
+                    if (currentItem.Count > 0)
                     {
                         formattedItems.AppendLine($"{string.Join(" ", currentItem)}\t1");
-                        currentItem.Clear();
-                        currentItem.Add(part);
                     }
-                    else
-                    {
-                        currentItem.Add(part);
-                    }
-                }
-
-                // Add the last item if there is one
-                if (currentItem.Count > 0)
-                {
-                    formattedItems.AppendLine($"{string.Join(" ", currentItem)}\t1");
                 }
 
                 var formattedItemsString = formattedItems.ToString().Trim();
