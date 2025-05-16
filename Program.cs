@@ -12,6 +12,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using Discord.Interactions;
+using System.Text;
 
 namespace EveOnlineBot
 {
@@ -266,6 +267,47 @@ namespace EveOnlineBot
                         var marketId = int.Parse(component.Data.Values.First());
                         Console.WriteLine($"Processing appraisal for market {marketId} with items: {items}");
 
+                        // Check if this is a recall command (items will be an appraisal code)
+                        if (items.Length == 6) // Appraisal codes are 6 characters
+                        {
+                            // Handle recall command
+                            var url = $"{_configuration["Janice:BaseUrl"]}/appraisal/{items}";
+                            var response = await _httpClient.GetAsync(url);
+                            var responseContent = await response.Content.ReadAsStringAsync();
+
+                            if (!response.IsSuccessStatusCode)
+                            {
+                                throw new Exception($"API request failed with status {response.StatusCode}: {responseContent}");
+                            }
+
+                            var recalledAppraisal = JsonSerializer.Deserialize<JsonElement>(responseContent);
+                            
+                            if (!recalledAppraisal.TryGetProperty("items", out var recalledItemsArray) || recalledItemsArray.GetArrayLength() == 0)
+                            {
+                                await component.RespondAsync("No valid items found in the appraisal.", ephemeral: true);
+                                return;
+                            }
+
+                            // Get the items from the appraisal
+                            var recalledItemsList = new StringBuilder();
+                            foreach (var item in recalledItemsArray.EnumerateArray())
+                            {
+                                if (item.TryGetProperty("itemType", out var itemType) && 
+                                    itemType.TryGetProperty("name", out var name) && 
+                                    item.TryGetProperty("amount", out var quantity))
+                                {
+                                    var itemName = name.GetString();
+                                    var itemQuantity = quantity.GetInt32();
+                                    if (!string.IsNullOrWhiteSpace(itemName))
+                                    {
+                                        recalledItemsList.AppendLine($"{itemName}\t{itemQuantity}");
+                                    }
+                                }
+                            }
+
+                            items = recalledItemsList.ToString().Trim();
+                        }
+
                         // Get the new appraisal
                         var fullAppraisal = await GetAppraisal(items, 1d, marketId);
                         var ninetyPercentAppraisal = await GetAppraisal(items, 0.9d, marketId);
@@ -301,6 +343,29 @@ namespace EveOnlineBot
                         embed.AddField("Volume Information", 
                             $"Total Volume: {totalVolume:N2} m³\n" +
                             $"Total Packaged Volume: {totalPackagedVolume:N2} m³", false);
+
+                        // Add items list
+                        var displayItemsList = new StringBuilder();
+                        foreach (var item in itemsArray.EnumerateArray())
+                        {
+                            if (item.TryGetProperty("itemType", out var itemType) && 
+                                itemType.TryGetProperty("name", out var name) && 
+                                item.TryGetProperty("amount", out var quantity))
+                            {
+                                var itemName = name.GetString();
+                                var itemQuantity = quantity.GetInt32();
+                                if (!string.IsNullOrWhiteSpace(itemName))
+                                {
+                                    displayItemsList.AppendLine($"{itemName}: {itemQuantity:N0}");
+                                }
+                            }
+                        }
+
+                        var itemsText = displayItemsList.ToString();
+                        if (!string.IsNullOrWhiteSpace(itemsText))
+                        {
+                            embed.AddField("Items in Request", itemsText, false);
+                        }
 
                         embed.AddField("Full Appraisal Code", fullAppraisalCode, false);
                         embed.AddField("90% Appraisal Code", ninetyPercentAppraisalCode, false);
@@ -501,12 +566,44 @@ namespace EveOnlineBot
 
                     var appraisal = JsonSerializer.Deserialize<JsonElement>(responseContent);
                     
-                    var totalSellValue = appraisal.GetProperty("effectivePrices").GetProperty("totalSellPrice").GetDecimal();
-                    var totalBuyValue = appraisal.GetProperty("effectivePrices").GetProperty("totalBuyPrice").GetDecimal();
-                    var totalSplitValue = appraisal.GetProperty("effectivePrices").GetProperty("totalSplitPrice").GetDecimal();
-                    var totalVolume = appraisal.GetProperty("totalVolume").GetDecimal();
-                    var totalPackagedVolume = appraisal.GetProperty("totalPackagedVolume").GetDecimal();
-                    var marketName = appraisal.GetProperty("market").GetProperty("name").GetString();
+                    if (!appraisal.TryGetProperty("items", out var itemsArray) || itemsArray.GetArrayLength() == 0)
+                    {
+                        await message.Channel.SendMessageAsync("No valid items found in the appraisal.");
+                        return;
+                    }
+
+                    // Safely get properties with error handling
+                    decimal totalSellValue = 0;
+                    decimal totalBuyValue = 0;
+                    decimal totalSplitValue = 0;
+                    decimal totalVolume = 0;
+                    decimal totalPackagedVolume = 0;
+                    string marketName = "Unknown";
+                    int marketId = 2; // Default to Jita 4-4
+
+                    try
+                    {
+                        if (appraisal.TryGetProperty("effectivePrices", out var prices))
+                        {
+                            if (prices.TryGetProperty("totalSellPrice", out var sellPrice)) totalSellValue = sellPrice.GetDecimal();
+                            if (prices.TryGetProperty("totalBuyPrice", out var buyPrice)) totalBuyValue = buyPrice.GetDecimal();
+                            if (prices.TryGetProperty("totalSplitPrice", out var splitPrice)) totalSplitValue = splitPrice.GetDecimal();
+                        }
+
+                        if (appraisal.TryGetProperty("totalVolume", out var volume)) totalVolume = volume.GetDecimal();
+                        if (appraisal.TryGetProperty("totalPackagedVolume", out var packagedVolume)) totalPackagedVolume = packagedVolume.GetDecimal();
+                        if (appraisal.TryGetProperty("market", out var market))
+                        {
+                            if (market.TryGetProperty("name", out var name)) marketName = name.GetString();
+                            if (market.TryGetProperty("id", out var id)) marketId = id.GetInt32();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Error parsing appraisal data: {ex}");
+                        await message.Channel.SendMessageAsync("Error parsing appraisal data. Please try again.");
+                        return;
+                    }
 
                     var embed = new EmbedBuilder()
                         .WithTitle("Recalled Appraisal")
@@ -514,18 +611,80 @@ namespace EveOnlineBot
                         .WithCurrentTimestamp()
                         .WithFooter($"Market: {marketName}");
 
-                    embed.AddField("Total Values", 
-                        $"Sell Value: {totalSellValue:N2} ISK\n" +
-                        $"Buy Value: {totalBuyValue:N2} ISK\n" +
-                        $"Split Value: {totalSplitValue:N2} ISK\n", false);
+                    // Add values field only if we have values
+                    var valuesText = $"Sell Value: {totalSellValue:N2} ISK\n" +
+                                   $"Buy Value: {totalBuyValue:N2} ISK\n" +
+                                   $"Split Value: {totalSplitValue:N2} ISK";
+                    if (!string.IsNullOrWhiteSpace(valuesText))
+                    {
+                        embed.AddField("Total Values", valuesText, false);
+                    }
 
-                    embed.AddField("Volume Information", 
-                        $"Total Volume: {totalVolume:N2} m³\n" +
-                        $"Total Packaged Volume: {totalPackagedVolume:N2} m³", false);
+                    // Add volume information only if we have volume data
+                    var volumeText = $"Total Volume: {totalVolume:N2} m³\n" +
+                                   $"Total Packaged Volume: {totalPackagedVolume:N2} m³";
+                    if (!string.IsNullOrWhiteSpace(volumeText))
+                    {
+                        embed.AddField("Volume Information", volumeText, false);
+                    }
 
+                    // Add items list
+                    var itemsList = new StringBuilder();
+                    Console.WriteLine($"Number of items in array: {itemsArray.GetArrayLength()}"); // Debug output
+
+                    foreach (var item in itemsArray.EnumerateArray())
+                    {
+                        try
+                        {
+                            Console.WriteLine($"Processing item: {item}"); // Debug output
+                            if (item.TryGetProperty("itemType", out var itemType) && 
+                                itemType.TryGetProperty("name", out var name) && 
+                                item.TryGetProperty("amount", out var quantity))
+                            {
+                                var itemName = name.GetString();
+                                var itemQuantity = quantity.GetInt32();
+                                Console.WriteLine($"Found item: {itemName} with quantity {itemQuantity}"); // Debug output
+                                if (!string.IsNullOrWhiteSpace(itemName))
+                                {
+                                    itemsList.AppendLine($"{itemName}: {itemQuantity:N0}");
+                                }
+                            }
+                            else
+                            {
+                                Console.WriteLine("Item missing name or quantity property"); // Debug output
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"Error parsing item data: {ex}");
+                            continue;
+                        }
+                    }
+
+                    var itemsText = itemsList.ToString();
+                    Console.WriteLine($"Final items text: {itemsText}"); // Debug output
+
+                    if (!string.IsNullOrWhiteSpace(itemsText))
+                    {
+                        embed.AddField("Items in Request", itemsText, false);
+                    }
+                    else
+                    {
+                        Console.WriteLine("Items text is empty or whitespace"); // Debug output
+                    }
+
+                    // Add appraisal code
                     embed.AddField("Appraisal Code", code, false);
 
-                    await message.Channel.SendMessageAsync(embed: embed.Build());
+                    // Create only copy buttons (no market selection)
+                    var copyButtons = ButtonUtils.CreateValueCopyButtons(
+                        totalSellValue,
+                        totalBuyValue,
+                        totalSplitValue,
+                        totalBuyValue // Using totalBuyValue for the 90% button since we don't have 90% data in recall
+                    );
+
+                    await message.Channel.SendMessageAsync(embed: embed.Build(), components: copyButtons.Build());
                 }                
                 catch (Exception ex)
                 {
@@ -941,6 +1100,53 @@ namespace EveOnlineBot
 
             try
             {
+                if (string.IsNullOrWhiteSpace(items))
+                {
+                    await FollowupAsync("Please provide items to appraise.");
+                    return;
+                }
+
+                // Format items string - handle items with quantities
+                var formattedItems = new StringBuilder();
+                var parts = items.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                var currentItem = new List<string>();
+                
+                for (int i = 0; i < parts.Length; i++)
+                {
+                    var part = parts[i].Trim();
+                    if (string.IsNullOrWhiteSpace(part)) continue;
+
+                    // If this part is a number, it's a quantity
+                    if (int.TryParse(part, out int quantity))
+                    {
+                        if (currentItem.Count > 0)
+                        {
+                            formattedItems.AppendLine($"{string.Join(" ", currentItem)}\t{quantity}");
+                            currentItem.Clear();
+                        }
+                    }
+                    // If this part starts with "Datacore" and we have a current item, start a new item
+                    else if (part.StartsWith("Datacore", StringComparison.OrdinalIgnoreCase) && currentItem.Count > 0)
+                    {
+                        formattedItems.AppendLine($"{string.Join(" ", currentItem)}\t1");
+                        currentItem.Clear();
+                        currentItem.Add(part);
+                    }
+                    else
+                    {
+                        currentItem.Add(part);
+                    }
+                }
+
+                // Add the last item if there is one
+                if (currentItem.Count > 0)
+                {
+                    formattedItems.AppendLine($"{string.Join(" ", currentItem)}\t1");
+                }
+
+                var formattedItemsString = formattedItems.ToString().Trim();
+                Console.WriteLine($"Formatted items for API:\n{formattedItemsString}"); // Debug output
+
                 // Find market ID from name
                 var marketId = _markets.FirstOrDefault(x => x.Value.Equals(selectedMarket, StringComparison.OrdinalIgnoreCase)).Key;
                 if (marketId == 0)
@@ -948,8 +1154,8 @@ namespace EveOnlineBot
                     marketId = 2; // Default to Jita 4-4 if market not found
                 }
 
-                var fullAppraisal = await GetAppraisal(items, 1d, marketId);
-                var ninetyPercentAppraisal = await GetAppraisal(items, 0.9d, marketId);
+                var fullAppraisal = await GetAppraisal(formattedItemsString, 1d, marketId);
+                var ninetyPercentAppraisal = await GetAppraisal(formattedItemsString, 0.9d, marketId);
 
                 if (!fullAppraisal.TryGetProperty("items", out var itemsArray) || itemsArray.GetArrayLength() == 0)
                 {
@@ -957,15 +1163,43 @@ namespace EveOnlineBot
                     return;
                 }
 
-                var totalSellValue = fullAppraisal.GetProperty("effectivePrices").GetProperty("totalSellPrice").GetDecimal();
-                var totalBuyValue = fullAppraisal.GetProperty("effectivePrices").GetProperty("totalBuyPrice").GetDecimal();
-                var totalSplitValue = fullAppraisal.GetProperty("effectivePrices").GetProperty("totalSplitPrice").GetDecimal();
-                var totalBuyValue90Percent = ninetyPercentAppraisal.GetProperty("effectivePrices").GetProperty("totalBuyPrice").GetDecimal();
-                var totalVolume = fullAppraisal.GetProperty("totalVolume").GetDecimal();
-                var totalPackagedVolume = fullAppraisal.GetProperty("totalPackagedVolume").GetDecimal();
-                var marketName = fullAppraisal.GetProperty("market").GetProperty("name").GetString();
-                var fullAppraisalCode = fullAppraisal.GetProperty("code").GetString();
-                var ninetyPercentAppraisalCode = ninetyPercentAppraisal.GetProperty("code").GetString();
+                // Safely get properties with error handling
+                decimal totalSellValue = 0;
+                decimal totalBuyValue = 0;
+                decimal totalSplitValue = 0;
+                decimal totalBuyValue90Percent = 0;
+                decimal totalVolume = 0;
+                decimal totalPackagedVolume = 0;
+                string marketName = "Unknown";
+                string fullAppraisalCode = "";
+                string ninetyPercentAppraisalCode = "";
+
+                try
+                {
+                    if (fullAppraisal.TryGetProperty("effectivePrices", out var prices))
+                    {
+                        if (prices.TryGetProperty("totalSellPrice", out var sellPrice)) totalSellValue = sellPrice.GetDecimal();
+                        if (prices.TryGetProperty("totalBuyPrice", out var buyPrice)) totalBuyValue = buyPrice.GetDecimal();
+                        if (prices.TryGetProperty("totalSplitPrice", out var splitPrice)) totalSplitValue = splitPrice.GetDecimal();
+                    }
+
+                    if (ninetyPercentAppraisal.TryGetProperty("effectivePrices", out var prices90))
+                    {
+                        if (prices90.TryGetProperty("totalBuyPrice", out var buyPrice90)) totalBuyValue90Percent = buyPrice90.GetDecimal();
+                    }
+
+                    if (fullAppraisal.TryGetProperty("totalVolume", out var volume)) totalVolume = volume.GetDecimal();
+                    if (fullAppraisal.TryGetProperty("totalPackagedVolume", out var packagedVolume)) totalPackagedVolume = packagedVolume.GetDecimal();
+                    if (fullAppraisal.TryGetProperty("market", out var market) && market.TryGetProperty("name", out var name)) marketName = name.GetString();
+                    if (fullAppraisal.TryGetProperty("code", out var code)) fullAppraisalCode = code.GetString();
+                    if (ninetyPercentAppraisal.TryGetProperty("code", out var code90)) ninetyPercentAppraisalCode = code90.GetString();
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error parsing appraisal data: {ex}");
+                    await FollowupAsync("Error parsing appraisal data. Please try again.");
+                    return;
+                }
 
                 var embed = new EmbedBuilder()
                     .WithTitle("Total Appraisal")
@@ -973,23 +1207,95 @@ namespace EveOnlineBot
                     .WithCurrentTimestamp()
                     .WithFooter($"Market: {marketName}");
 
-                embed.AddField("Total Values", 
-                    $"Sell Value: {totalSellValue:N2} ISK\n" +
-                    $"Buy Value: {totalBuyValue:N2} ISK\n" +
-                    $"Split Value: {totalSplitValue:N2} ISK\n" +
-                    $"Buy Value @90%: {totalBuyValue90Percent:N2} ISK", false);
+                // Add values field only if we have values
+                var valuesText = $"Sell Value: {totalSellValue:N2} ISK\n" +
+                               $"Buy Value: {totalBuyValue:N2} ISK\n" +
+                               $"Split Value: {totalSplitValue:N2} ISK\n" +
+                               $"Buy Value @90%: {totalBuyValue90Percent:N2} ISK";
+                if (!string.IsNullOrWhiteSpace(valuesText))
+                {
+                    embed.AddField("Total Values", valuesText, false);
+                }
 
-                embed.AddField("Volume Information", 
-                    $"Total Volume: {totalVolume:N2} m³\n" +
-                    $"Total Packaged Volume: {totalPackagedVolume:N2} m³", false);
+                // Add volume information only if we have volume data
+                var volumeText = $"Total Volume: {totalVolume:N2} m³\n" +
+                               $"Total Packaged Volume: {totalPackagedVolume:N2} m³";
+                if (!string.IsNullOrWhiteSpace(volumeText))
+                {
+                    embed.AddField("Volume Information", volumeText, false);
+                }
 
-                embed.AddField("Full Appraisal Code", fullAppraisalCode, false);
-                embed.AddField("90% Appraisal Code", ninetyPercentAppraisalCode, false);
+                // Add items list for slash command
+                var itemsList = new StringBuilder();
+                Console.WriteLine($"Number of items in array: {itemsArray.GetArrayLength()}"); // Debug output
 
-                // Create the component with buttons, highlighting the selected market
-                var componentBuilder = ButtonUtils.CreateMarketSelectMenu(items, marketId, _markets);
+                foreach (var item in itemsArray.EnumerateArray())
+                {
+                    try
+                    {
+                        Console.WriteLine($"Processing item: {item}"); // Debug output
+                        if (item.TryGetProperty("itemType", out var itemType) && 
+                            itemType.TryGetProperty("name", out var name) && 
+                            item.TryGetProperty("amount", out var quantity))
+                        {
+                            var itemName = name.GetString();
+                            var itemQuantity = quantity.GetInt32();
+                            Console.WriteLine($"Found item: {itemName} with quantity {itemQuantity}"); // Debug output
+                            if (!string.IsNullOrWhiteSpace(itemName))
+                            {
+                                itemsList.AppendLine($"{itemName}: {itemQuantity:N0}");
+                            }
+                        }
+                        else
+                        {
+                            Console.WriteLine("Item missing name or quantity property"); // Debug output
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Error parsing item data: {ex}");
+                        continue;
+                    }
+                }
 
-                await FollowupAsync(embed: embed.Build(), components: componentBuilder.Build());
+                var itemsText = itemsList.ToString();
+                Console.WriteLine($"Final items text: {itemsText}"); // Debug output
+
+                if (!string.IsNullOrWhiteSpace(itemsText))
+                {
+                    embed.AddField("Items in Request", itemsText, false);
+                }
+                else
+                {
+                    Console.WriteLine("Items text is empty or whitespace"); // Debug output
+                }
+
+                // Add appraisal codes only if they exist
+                if (!string.IsNullOrWhiteSpace(fullAppraisalCode))
+                {
+                    embed.AddField("Full Appraisal Code", fullAppraisalCode, false);
+                }
+                if (!string.IsNullOrWhiteSpace(ninetyPercentAppraisalCode))
+                {
+                    embed.AddField("90% Appraisal Code", ninetyPercentAppraisalCode, false);
+                }
+
+                // Create the components with both market select menu and copy buttons
+                var marketSelect = ButtonUtils.CreateMarketSelectMenu(formattedItemsString, marketId, _markets);
+                var copyButtons = ButtonUtils.CreateValueCopyButtons(
+                    totalSellValue,
+                    totalBuyValue,
+                    totalSplitValue,
+                    totalBuyValue90Percent
+                );
+
+                // Combine both component sets
+                foreach (var row in copyButtons.ActionRows)
+                {
+                    marketSelect.AddRow(row);
+                }
+
+                await FollowupAsync(embed: embed.Build(), components: marketSelect.Build());
             }
             catch (Exception ex)
             {
@@ -1017,12 +1323,44 @@ namespace EveOnlineBot
 
                 var appraisal = JsonSerializer.Deserialize<JsonElement>(responseContent);
                 
-                var totalSellValue = appraisal.GetProperty("effectivePrices").GetProperty("totalSellPrice").GetDecimal();
-                var totalBuyValue = appraisal.GetProperty("effectivePrices").GetProperty("totalBuyPrice").GetDecimal();
-                var totalSplitValue = appraisal.GetProperty("effectivePrices").GetProperty("totalSplitPrice").GetDecimal();
-                var totalVolume = appraisal.GetProperty("totalVolume").GetDecimal();
-                var totalPackagedVolume = appraisal.GetProperty("totalPackagedVolume").GetDecimal();
-                var marketName = appraisal.GetProperty("market").GetProperty("name").GetString();
+                if (!appraisal.TryGetProperty("items", out var itemsArray) || itemsArray.GetArrayLength() == 0)
+                {
+                    await FollowupAsync("No valid items found in the appraisal.");
+                    return;
+                }
+
+                // Safely get properties with error handling
+                decimal totalSellValue = 0;
+                decimal totalBuyValue = 0;
+                decimal totalSplitValue = 0;
+                decimal totalVolume = 0;
+                decimal totalPackagedVolume = 0;
+                string marketName = "Unknown";
+                int marketId = 2; // Default to Jita 4-4
+
+                try
+                {
+                    if (appraisal.TryGetProperty("effectivePrices", out var prices))
+                    {
+                        if (prices.TryGetProperty("totalSellPrice", out var sellPrice)) totalSellValue = sellPrice.GetDecimal();
+                        if (prices.TryGetProperty("totalBuyPrice", out var buyPrice)) totalBuyValue = buyPrice.GetDecimal();
+                        if (prices.TryGetProperty("totalSplitPrice", out var splitPrice)) totalSplitValue = splitPrice.GetDecimal();
+                    }
+
+                    if (appraisal.TryGetProperty("totalVolume", out var volume)) totalVolume = volume.GetDecimal();
+                    if (appraisal.TryGetProperty("totalPackagedVolume", out var packagedVolume)) totalPackagedVolume = packagedVolume.GetDecimal();
+                    if (appraisal.TryGetProperty("market", out var market))
+                    {
+                        if (market.TryGetProperty("name", out var name)) marketName = name.GetString();
+                        if (market.TryGetProperty("id", out var id)) marketId = id.GetInt32();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error parsing appraisal data: {ex}");
+                    await FollowupAsync("Error parsing appraisal data. Please try again.");
+                    return;
+                }
 
                 var embed = new EmbedBuilder()
                     .WithTitle("Recalled Appraisal")
@@ -1030,18 +1368,80 @@ namespace EveOnlineBot
                     .WithCurrentTimestamp()
                     .WithFooter($"Market: {marketName}");
 
-                embed.AddField("Total Values", 
-                    $"Sell Value: {totalSellValue:N2} ISK\n" +
-                    $"Buy Value: {totalBuyValue:N2} ISK\n" +
-                    $"Split Value: {totalSplitValue:N2} ISK\n", false);
+                // Add values field only if we have values
+                var valuesText = $"Sell Value: {totalSellValue:N2} ISK\n" +
+                               $"Buy Value: {totalBuyValue:N2} ISK\n" +
+                               $"Split Value: {totalSplitValue:N2} ISK";
+                if (!string.IsNullOrWhiteSpace(valuesText))
+                {
+                    embed.AddField("Total Values", valuesText, false);
+                }
 
-                embed.AddField("Volume Information", 
-                    $"Total Volume: {totalVolume:N2} m³\n" +
-                    $"Total Packaged Volume: {totalPackagedVolume:N2} m³", false);
+                // Add volume information only if we have volume data
+                var volumeText = $"Total Volume: {totalVolume:N2} m³\n" +
+                               $"Total Packaged Volume: {totalPackagedVolume:N2} m³";
+                if (!string.IsNullOrWhiteSpace(volumeText))
+                {
+                    embed.AddField("Volume Information", volumeText, false);
+                }
 
+                // Add items list
+                var itemsList = new StringBuilder();
+                Console.WriteLine($"Number of items in array: {itemsArray.GetArrayLength()}"); // Debug output
+
+                foreach (var item in itemsArray.EnumerateArray())
+                {
+                    try
+                    {
+                        Console.WriteLine($"Processing item: {item}"); // Debug output
+                        if (item.TryGetProperty("itemType", out var itemType) && 
+                            itemType.TryGetProperty("name", out var name) && 
+                            item.TryGetProperty("amount", out var quantity))
+                        {
+                            var itemName = name.GetString();
+                            var itemQuantity = quantity.GetInt32();
+                            Console.WriteLine($"Found item: {itemName} with quantity {itemQuantity}"); // Debug output
+                            if (!string.IsNullOrWhiteSpace(itemName))
+                            {
+                                itemsList.AppendLine($"{itemName}: {itemQuantity:N0}");
+                            }
+                        }
+                        else
+                        {
+                            Console.WriteLine("Item missing name or quantity property"); // Debug output
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Error parsing item data: {ex}");
+                        continue;
+                    }
+                }
+
+                var itemsText = itemsList.ToString();
+                Console.WriteLine($"Final items text: {itemsText}"); // Debug output
+
+                if (!string.IsNullOrWhiteSpace(itemsText))
+                {
+                    embed.AddField("Items in Request", itemsText, false);
+                }
+                else
+                {
+                    Console.WriteLine("Items text is empty or whitespace"); // Debug output
+                }
+
+                // Add appraisal code
                 embed.AddField("Appraisal Code", code, false);
 
-                await FollowupAsync(embed: embed.Build());
+                // Create only copy buttons (no market selection)
+                var copyButtons = ButtonUtils.CreateValueCopyButtons(
+                    totalSellValue,
+                    totalBuyValue,
+                    totalSplitValue,
+                    totalBuyValue // Using totalBuyValue for the 90% button since we don't have 90% data in recall
+                );
+
+                await FollowupAsync(embed: embed.Build(), components: copyButtons.Build());
             }
             catch (Exception ex)
             {
