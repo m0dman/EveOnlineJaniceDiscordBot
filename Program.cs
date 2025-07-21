@@ -835,40 +835,227 @@ namespace EveOnlineBot
                 }
             }
 
+            // Help command with mention requirement
+            else if (Regex.IsMatch(message.Content, @"!help\b"))
+            {
+                Console.WriteLine($"Help command triggered. Message content: {message.Content}");
+                Console.WriteLine($"Bot user ID: {_client.CurrentUser.Id}");
+                Console.WriteLine($"Bot username: {_client.CurrentUser.Username}");
+                Console.WriteLine($"Mentioned users: {string.Join(", ", message.MentionedUsers.Select(u => $"{u.Username}({u.Id})"))}");
+                
+                // Check if the bot is mentioned in the message
+                bool isMentioned = message.MentionedUsers.Any(u => u.Id == _client.CurrentUser.Id);
+                Console.WriteLine($"Is bot mentioned: {isMentioned}");
+                
+                // Only respond if the bot is mentioned
+                if (isMentioned)
+                {
+                    Console.WriteLine("Bot is mentioned, sending help embed...");
+                    var embed = new EmbedBuilder()
+                        .WithTitle("EVE Online Janice Bot Commands")
+                        .WithColor(Color.Blue)
+                        .WithDescription("Here are all the available commands for the Janice EVE Online Discord bot. Use these to appraise items, recall appraisals, and more. For best results, paste item lists as you see them in-game.")
+                        .WithCurrentTimestamp();
+
+                    embed.AddField("!appraise", 
+                        "**Appraise items at full market value (Jita 4-4 by default).**\n" +
+                        "Paste a list of items (one per line, or in-game copy-paste format).\n" +
+                        "**Usage:** `!appraise <items>`\n" +
+                        "**Example:**\n\u0060\u0060\u0060\n!appraise PLEX\\nTritanium 10000\\nIsogen 5000\n\u0060\u0060\u0060", false);
+
+                    embed.AddField("!recall", 
+                        "**Recall a previous appraisal using its code.**\n" +
+                        "Returns the values and items for a previously appraised list.\n" +
+                        "**Usage:** `!recall <appraisal_code>`\n" +
+                        "**Example:** `!recall ABC123`", false);
+
+                    embed.AddField("!npcbuy", 
+                        "**Appraise items at NPC buy prices (100% value, NPC market).**\n" +
+                        "Paste a list of items (one per line, or in-game copy-paste format).\n" +
+                        "**Usage:** `!npcbuy <items>`\n" +
+                        "**Example:**\n\u0060\u0060\u0060\n!npcbuy PLEX\\nTritanium 10000\n\u0060\u0060\u0060", false);
+
+                    embed.AddField("!npcbuy90", 
+                        "**Appraise items at NPC buy prices (90% value, NPC market).**\n" +
+                        "Paste a list of items (one per line, or in-game copy-paste format).\n" +
+                        "**Usage:** `!npcbuy90 <items>`\n" +
+                        "**Example:**\n\u0060\u0060\u0060\n!npcbuy90 PLEX\\nTritanium 10000\n\u0060\u0060\u0060", false);
+
+                    embed.AddField("!appraiseAssets", 
+                        "**Appraise a copy-paste from the EVE Online personal assets window.**\n" +
+                        "Paste the full table from the in-game assets window. The bot will extract item names and quantities.\n" +
+                        "**Usage:** `!appraiseAssets <paste>`\n" +
+                        "**Example:**\n\u0060\u0060\u0060\n!appraiseAssets\\nEifyrium    180    Eifyrium    2,880 m3    852,377.40 ISK\\nIsogen    12,650    Mineral    126.50 m3    4,602,196.50 ISK\n\u0060\u0060\u0060", false);
+
+                    embed.AddField("!help (with mention)", 
+                        $"**Show this help menu, but only if you mention the bot.**\n" +
+                        $"**Usage:** `@{_client.CurrentUser.Username} !help`\n" +
+                        "(This avoids conflicts with other bots.)", false);
+
+                    embed.AddField("!janicehelp", 
+                        "**Show this help menu.**\n" +
+                        "**Usage:** `!janicehelp`\n" +
+                        "(Use this if you don't want to mention the bot.)", false);
+
+                    await message.Channel.SendMessageAsync(embed: embed.Build());
+                }
+                else
+                {
+                    Console.WriteLine("Bot is not mentioned, ignoring help command.");
+                }
+                // If not mentioned, do nothing (let other bots handle it)
+            }
+
             // Help command
-            else if (Regex.IsMatch(message.Content, @"^!help\b"))
+            else if (Regex.IsMatch(message.Content, @"^!janicehelp\b"))
             {
                 var embed = new EmbedBuilder()
-                    .WithTitle("EVE Online Bot Commands")
+                    .WithTitle("EVE Online Janice Bot Commands")
                     .WithColor(Color.Blue)
-                    .WithDescription("Here are all the available commands and how to use them:")
+                    .WithDescription("Here are all the available commands for the Janice EVE Online Discord bot. Use these to appraise items, recall appraisals, and more. For best results, paste item lists as you see them in-game.")
                     .WithCurrentTimestamp();
 
                 embed.AddField("!appraise", 
-                    "Get an appraisal for items at full market value.\n" +
-                    "Usage: `!appraise <items>`\n" +
-                    "Example: `!appraise PLEX` or `!appraise` followed by a list of items", false);
+                    "**Appraise items at full market value (Jita 4-4 by default).**\n" +
+                    "Paste a list of items (one per line, or in-game copy-paste format).\n" +
+                    "**Usage:** `!appraise <items>`\n" +
+                    "**Example:**\n\u0060\u0060\u0060\n!appraise PLEX\\nTritanium 10000\\nIsogen 5000\n\u0060\u0060\u0060", false);
 
                 embed.AddField("!recall", 
-                    "Recall a previous appraisal using its code.\n" +
-                    "Usage: `!recall <appraisal_code>`\n" +
-                    "Example: `!recall ABC123`", false);
+                    "**Recall a previous appraisal using its code.**\n" +
+                    "Returns the values and items for a previously appraised list.\n" +
+                    "**Usage:** `!recall <appraisal_code>`\n" +
+                    "**Example:** `!recall ABC123`", false);
 
                 embed.AddField("!npcbuy", 
-                    "Get an appraisal for items at NPC buy prices (100% value).\n" +
-                    "Usage: `!npcbuy <items>`\n" +
-                    "Example: `!npcbuy PLEX` or `!npcbuy` followed by a list of items", false);
+                    "**Appraise items at NPC buy prices (100% value, NPC market).**\n" +
+                    "Paste a list of items (one per line, or in-game copy-paste format).\n" +
+                    "**Usage:** `!npcbuy <items>`\n" +
+                    "**Example:**\n\u0060\u0060\u0060\n!npcbuy PLEX\\nTritanium 10000\n\u0060\u0060\u0060", false);
 
                 embed.AddField("!npcbuy90", 
-                    "Get an appraisal for items at NPC buy prices (90% value).\n" +
-                    "Usage: `!npcbuy90 <items>`\n" +
-                    "Example: `!npcbuy90 PLEX` or `!npcbuy90` followed by a list of items", false);
+                    "**Appraise items at NPC buy prices (90% value, NPC market).**\n" +
+                    "Paste a list of items (one per line, or in-game copy-paste format).\n" +
+                    "**Usage:** `!npcbuy90 <items>`\n" +
+                    "**Example:**\n\u0060\u0060\u0060\n!npcbuy90 PLEX\\nTritanium 10000\n\u0060\u0060\u0060", false);
 
-                embed.AddField("!help", 
-                    "Display this help message with all available commands.\n" +
-                    "Usage: `!help`", false);
+                embed.AddField("!appraiseAssets", 
+                    "**Appraise a copy-paste from the EVE Online personal assets window.**\n" +
+                    "Paste the full table from the in-game assets window. The bot will extract item names and quantities.\n" +
+                    "**Usage:** `!appraiseAssets <paste>`\n" +
+                    "**Example:**\n\u0060\u0060\u0060\n!appraiseAssets\\nEifyrium    180    Eifyrium    2,880 m3    852,377.40 ISK\\nIsogen    12,650    Mineral    126.50 m3    4,602,196.50 ISK\n\u0060\u0060\u0060", false);
+
+                embed.AddField("!help (with mention)", 
+                    $"**Show this help menu, but only if you mention the bot.**\n" +
+                    $"**Usage:** `@{_client.CurrentUser.Username} !help`\n" +
+                    "(This avoids conflicts with other bots.)", false);
+
+                embed.AddField("!janicehelp", 
+                    "**Show this help menu.**\n" +
+                    "**Usage:** `!janicehelp`\n" +
+                    "(Use this if you don't want to mention the bot.)", false);
 
                 await message.Channel.SendMessageAsync(embed: embed.Build());
+            }
+
+            // AppraiseAssets command
+            else if (Regex.IsMatch(message.Content, @"^!appraiseAssets\b", RegexOptions.IgnoreCase))
+            {
+                var content = Regex.Replace(message.Content, @"^!appraiseAssets\b", "", RegexOptions.IgnoreCase).Trim();
+                if (string.IsNullOrEmpty(content))
+                {
+                    await message.Channel.SendMessageAsync("Please provide assets to appraise (copy-paste from the personal assets window).");
+                    return;
+                }
+
+                try
+                {
+                    // Split the input into lines and process each line
+                    var lines = content.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+                    var formattedItems = new StringBuilder();
+
+                    foreach (var line in lines)
+                    {
+                        // Split by tab or multiple spaces
+                        var parts = Regex.Split(line.Trim(), "\t+| {2,}");
+                        if (parts.Length < 2) continue; // Need at least name and quantity
+
+                        var itemName = parts[0].Trim();
+                        var quantityStr = parts[1].Replace(",", "").Trim();
+                        if (!int.TryParse(quantityStr, out int quantity)) continue;
+                        if (string.IsNullOrWhiteSpace(itemName)) continue;
+
+                        formattedItems.AppendLine($"{itemName}\t{quantity}");
+                    }
+
+                    var requestBody = formattedItems.ToString().Trim();
+                    if (string.IsNullOrEmpty(requestBody))
+                    {
+                        await message.Channel.SendMessageAsync("No valid items found in the assets paste.");
+                        return;
+                    }
+                    Console.WriteLine($"Formatted assets for API:\n{requestBody}");
+
+                    var fullAppraisal = await GetAppraisal(requestBody, 1d, 2);
+                    var ninetyPercentAppraisal = await GetAppraisal(requestBody, 0.9d, 2);
+
+                    if (!fullAppraisal.TryGetProperty("items", out var itemsArray) || itemsArray.GetArrayLength() == 0)
+                    {
+                        await message.Channel.SendMessageAsync("No valid items found in the appraisal.");
+                        return;
+                    }
+
+                    var totalSellValue = fullAppraisal.GetProperty("effectivePrices").GetProperty("totalSellPrice").GetDecimal();
+                    var totalBuyValue = fullAppraisal.GetProperty("effectivePrices").GetProperty("totalBuyPrice").GetDecimal();
+                    var totalSplitValue = fullAppraisal.GetProperty("effectivePrices").GetProperty("totalSplitPrice").GetDecimal();
+                    var totalBuyValue90Percent = ninetyPercentAppraisal.GetProperty("effectivePrices").GetProperty("totalBuyPrice").GetDecimal();
+                    var totalVolume = fullAppraisal.GetProperty("totalVolume").GetDecimal();
+                    var totalPackagedVolume = fullAppraisal.GetProperty("totalPackagedVolume").GetDecimal();
+                    var marketName = fullAppraisal.GetProperty("market").GetProperty("name").GetString();
+                    var fullAppraisalCode = fullAppraisal.GetProperty("code").GetString();
+                    var ninetyPercentAppraisalCode = ninetyPercentAppraisal.GetProperty("code").GetString();
+
+                    var embed = new EmbedBuilder()
+                        .WithTitle("Assets Appraisal")
+                        .WithColor(Color.Purple)
+                        .WithCurrentTimestamp()
+                        .WithFooter($"Market: {marketName}");
+
+                    embed.AddField("Total Values", 
+                        $"Sell Value: {totalSellValue:N2} ISK\n" +
+                        $"Buy Value: {totalBuyValue:N2} ISK\n" +
+                        $"Split Value: {totalSplitValue:N2} ISK\n" +
+                        $"Buy Value @90%: {totalBuyValue90Percent:N2} ISK", false);
+
+                    embed.AddField("Volume Information", 
+                        $"Total Volume: {totalVolume:N2} m³\n" +
+                        $"Total Packaged Volume: {totalPackagedVolume:N2} m³", false);
+
+                    embed.AddField("Full Appraisal Code", fullAppraisalCode, false);
+                    embed.AddField("90% Appraisal Code", ninetyPercentAppraisalCode, false);
+
+                    // Create the components with both market buttons and copy buttons
+                    var marketButtons = CreateMarketButtons(requestBody, 2);
+                    var copyButtons = ButtonUtils.CreateValueCopyButtons(
+                        totalSellValue,
+                        totalBuyValue,
+                        totalSplitValue,
+                        totalBuyValue90Percent
+                    );
+
+                    // Combine both button sets
+                    foreach (var row in copyButtons.ActionRows)
+                    {
+                        marketButtons.AddRow(row);
+                    }
+
+                    await message.Channel.SendMessageAsync(embed: embed.Build(), components: marketButtons.Build());
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error in !appraiseAssets: {ex}");
+                    await message.Channel.SendMessageAsync($"Error appraising assets: {ex.Message}");
+                }
             }
         }
 
@@ -999,6 +1186,7 @@ namespace EveOnlineBot
                 Console.WriteLine($"Making request to: {url}");
                 Console.WriteLine($"Using API Key: {_configuration["Janice:ApiKey"]}");
                 Console.WriteLine($"Market ID: {market}");
+                Console.WriteLine($"Request body (items): {items}");
 
                 var content = new StringContent(
                     items,
@@ -1019,6 +1207,14 @@ namespace EveOnlineBot
 
                 if (!response.IsSuccessStatusCode)
                 {
+                    Console.WriteLine($"=== ERROR RESPONSE DETAILS ===");
+                    Console.WriteLine($"Status Code: {response.StatusCode}");
+                    Console.WriteLine($"Status Code Number: {(int)response.StatusCode}");
+                    Console.WriteLine($"Response Content Length: {responseContent?.Length ?? 0}");
+                    Console.WriteLine($"Full Response Content: '{responseContent}'");
+                    Console.WriteLine($"Response Headers: {string.Join(", ", response.Headers.Select(h => $"{h.Key}: {string.Join(", ", h.Value)}"))}");
+                    Console.WriteLine($"Request Headers: {string.Join(", ", _httpClient.DefaultRequestHeaders.Select(h => $"{h.Key}: {string.Join(", ", h.Value)}"))}");
+                    Console.WriteLine($"=== END ERROR RESPONSE ===");
                     throw new Exception($"API request failed with status {response.StatusCode}: {responseContent}");
                 }
 
@@ -1502,6 +1698,7 @@ namespace EveOnlineBot
                 Console.WriteLine($"Making request to: {url}");
                 Console.WriteLine($"Using API Key: {_configuration["Janice:ApiKey"]}");
                 Console.WriteLine($"Market ID: {market}");
+                Console.WriteLine($"Request body (items): {items}");
 
                 var content = new StringContent(
                     items,
@@ -1522,6 +1719,14 @@ namespace EveOnlineBot
 
                 if (!response.IsSuccessStatusCode)
                 {
+                    Console.WriteLine($"=== ERROR RESPONSE DETAILS ===");
+                    Console.WriteLine($"Status Code: {response.StatusCode}");
+                    Console.WriteLine($"Status Code Number: {(int)response.StatusCode}");
+                    Console.WriteLine($"Response Content Length: {responseContent?.Length ?? 0}");
+                    Console.WriteLine($"Full Response Content: '{responseContent}'");
+                    Console.WriteLine($"Response Headers: {string.Join(", ", response.Headers.Select(h => $"{h.Key}: {string.Join(", ", h.Value)}"))}");
+                    Console.WriteLine($"Request Headers: {string.Join(", ", _httpClient.DefaultRequestHeaders.Select(h => $"{h.Key}: {string.Join(", ", h.Value)}"))}");
+                    Console.WriteLine($"=== END ERROR RESPONSE ===");
                     throw new Exception($"API request failed with status {response.StatusCode}: {responseContent}");
                 }
 
