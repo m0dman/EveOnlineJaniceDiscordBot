@@ -7,7 +7,9 @@
     <Nullable>enable</Nullable>
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>true</SelfContained>
-    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <!-- RuntimeIdentifier is not set by default so the app runs on current OS (Windows/Linux).
+         Publish for Linux: dotnet publish -r linux-x64 -c Release
+         Publish for Windows: dotnet publish -r win-x64 -c Release -->
     <PublishReadyToRun>true</PublishReadyToRun>
   </PropertyGroup>
 
